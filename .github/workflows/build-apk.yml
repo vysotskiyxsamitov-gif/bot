@@ -1,4 +1,7 @@
-name: Build Android APK
+name: Build AutoX APK
+
+# Собирает отдельное приложение (APK) из скрипта tiktok_chest_android.js
+# на базе открытого AutoX.js (шаблон "inrt" — рантайм для упакованных скриптов).
 
 on:
   push:
@@ -6,48 +9,60 @@ on:
   workflow_dispatch:
 
 env:
-  APP_NAME: "Мой сайт"
-  APP_ID: "com.example.mysite"
+  APP_NAME: "Chest Bot"
+  APP_PACKAGE: "com.example.chestbot"
+  SCRIPT: "tiktok_chest_android.js"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Checkout your repo
+        uses: actions/checkout@v4
         with:
-          node-version: 20
+          path: repo
+
+      - name: Checkout AutoX.js
+        uses: actions/checkout@v4
+        with:
+          repository: kkevsekk1/AutoX
+          path: autox
+          submodules: recursive
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # Копируем файлы сайта в папку www.
-      # Если у сайта есть сборка (React/Vite и т.п.) — добавь тут npm ci && npm run build
-      # и замени источник копирования на dist/ или build/.
-      - name: Prepare web files
+      - name: Put your script into the app template
         run: |
-          mkdir -p /tmp/www
-          rsync -a --exclude=.git --exclude=.github --exclude=node_modules ./ /tmp/www/
-          mkdir www && cp -r /tmp/www/. www/
-
-      - name: Setup Capacitor
-        run: |
-          npm init -y
-          npm i @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "$APP_NAME" "$APP_ID" --web-dir=www
-          npx cap add android
-          npx cap sync android
+          PROJ=autox/inrt/src/main/assets/project
+          rm -rf "$PROJ" && mkdir -p "$PROJ"
+          cp "repo/$SCRIPT" "$PROJ/main.js"
+          # картинки для поиска на экране (если лежат в репозитории)
+          cp repo/*.png "$PROJ/" 2>/dev/null || echo "png в корне репозитория не найдены"
+          cat > "$PROJ/project.json" << JSON
+          {
+            "name": "$APP_NAME",
+            "main": "main.js",
+            "packageName": "$APP_PACKAGE",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "launchConfig": { "hideLogs": true }
+          }
+          JSON
+          ls -la "$PROJ"
 
       - name: Build APK
+        working-directory: autox
         run: |
-          cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew :inrt:assembleDebug --no-daemon --stacktrace
+
+      - name: Find APK
+        run: find autox -name "*.apk" -path "*inrt*" | tee apk-list.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: chest-bot-apk
+          path: autox/inrt/build/outputs/apk/**/*.apk
