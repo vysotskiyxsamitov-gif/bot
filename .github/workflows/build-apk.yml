@@ -53,11 +53,25 @@ jobs:
           JSON
           ls -la "$PROJ"
 
+      # JitPack публикует RootShell под именем в нижнем регистре (stericson)
+      - name: Fix RootShell dependency name
+        run: |
+          grep -rl "com.github.Stericson" autox --include=*.gradle --include=*.kts --include=*.toml \
+            | xargs -r sed -i 's/com\.github\.Stericson/com.github.stericson/g' || true
+          grep -rn "RootShell" autox --include=*.gradle --include=*.kts --include=*.toml || true
+
+      # JitPack собирает библиотеки при первом запросе, поэтому первая попытка может
+      # упасть с "Could not find" — повторяем до 3 раз.
       - name: Build APK
         working-directory: autox
         run: |
           chmod +x gradlew
-          ./gradlew :inrt:assembleDebug --no-daemon --stacktrace
+          for i in 1 2 3; do
+            ./gradlew :inrt:assembleDebug --no-daemon --stacktrace && exit 0
+            echo "Попытка $i не удалась, жду 60 сек..."
+            sleep 60
+          done
+          exit 1
 
       - name: Find APK
         run: find autox -name "*.apk" -path "*inrt*" | tee apk-list.txt
