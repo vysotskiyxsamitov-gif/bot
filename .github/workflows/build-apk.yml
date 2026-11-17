@@ -12,6 +12,7 @@ env:
   APP_NAME: "Chest Bot"
   APP_PACKAGE: "com.example.chestbot"
   SCRIPT: "tiktok_chest_android.js"
+  AUTOX_REPO: "autox-community/AutoX"
 
 jobs:
   build:
@@ -25,9 +26,8 @@ jobs:
       - name: Checkout AutoX.js
         uses: actions/checkout@v4
         with:
-          repository: kkevsekk1/AutoX
+          repository: ${{ env.AUTOX_REPO }}
           path: autox
-          submodules: recursive
 
       - uses: actions/setup-java@v4
         with:
